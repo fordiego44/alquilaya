@@ -184,8 +184,28 @@ Opciones consideradas para el futuro:
 - Almacenamiento local como punto de partida
 
 Requisito arquitectónico derivado: la aplicación debe permitir **sustituir el adaptador de persistencia sin tocar
-las reglas de dominio**. El dominio define los puertos; la infraestructura los implementa cuando exista una
-decisión.
+las reglas de dominio**.
+
+Para lograrlo, el acceso a datos ocurre siempre a través de **puertos**, con estas reglas de ubicación:
+
+- Un puerto se define **en la capa que lo necesita**, junto a sus consumidores; no por defecto en el dominio.
+- Los puertos de **persistencia y orquestación** viven en `lib/aplicacion/puertos/`, porque sus únicos
+  consumidores son los casos de uso.
+- La **infraestructura** futura implementará esos puertos; ninguna capa interna conoce a sus implementaciones.
+- El **dominio** no depende de la aplicación ni de la infraestructura: es el núcleo puro al que apuntan todas las
+  dependencias.
+
+Dirección de dependencias:
+
+```
+infraestructura
+    ↓ implementa
+aplicacion/puertos
+    ↓ consumidos por
+aplicacion (casos de uso)
+    ↓ usa
+dominio
+```
 
 ## 8. Glosario
 
