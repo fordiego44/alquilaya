@@ -22,3 +22,27 @@ class InquilinoNoEncontrado implements Exception {
   @override
   String toString() => 'No existe el inquilino $id';
 }
+
+/// El contrato pedido no existe en el almacén.
+class ContratoNoEncontrado implements Exception {
+  final String id;
+
+  ContratoNoEncontrado(this.id);
+
+  @override
+  String toString() => 'No existe el contrato $id';
+}
+
+/// Regla 1: la habitación ya tiene un contrato activo.
+///
+/// La regla es de negocio, pero solo es comprobable consultando el almacén, y
+/// eso es orquestación: por eso la excepción vive aquí y no en el dominio.
+class HabitacionOcupada implements Exception {
+  final String habitacionId;
+
+  HabitacionOcupada(this.habitacionId);
+
+  @override
+  String toString() =>
+      'La habitación $habitacionId ya tiene un contrato activo';
+}

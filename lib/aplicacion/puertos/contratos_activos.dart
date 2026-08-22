@@ -6,8 +6,11 @@
 ///
 /// Aquí vive la mitad *de lectura* de la regla 1 de PROJECT.md: una habitación
 /// está ocupada si y solo si tiene un contrato activo. La mitad *de escritura*
-/// —impedir un segundo contrato activo— corresponde a `CrearContrato`, que
-/// reutilizará [tieneContratoActivo] cuando exista.
+/// —impedir un segundo contrato activo— la aplica `CrearContrato` con
+/// [tieneContratoActivo].
+///
+/// `RepositorioDeContratos` extiende este puerto: la ocupación se responde
+/// siempre desde los contratos realmente guardados.
 abstract interface class ContratosActivos {
   /// Ids de las habitaciones ocupadas. Existe para resolver un listado
   /// completo con una sola consulta en lugar de una por habitación.

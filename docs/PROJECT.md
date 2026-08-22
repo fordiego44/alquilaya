@@ -111,9 +111,10 @@ llegaría a mostrar totales como `1049.9999999999998`. La conversión entre lo q
 
 ## 5. Reglas de negocio
 
-Reglas que el dominio debe garantizar:
+Reglas de negocio que el sistema debe garantizar:
 
-1. Una habitación **no puede tener dos contratos activos simultáneamente**.
+1. Una habitación **no puede tener dos contratos activos simultáneamente**. La comprobación ocurre al crear un
+   contrato, consultando si la habitación ya tiene uno activo.
 2. Todo monto (monto mensual, monto de cuota, monto de pago) debe ser **positivo**, y se representa en
    **centavos enteros**.
 3. **Finalizar un contrato no elimina su historial**: el contrato, sus cuotas y sus pagos siguen siendo
@@ -152,8 +153,14 @@ Reglas que el dominio debe garantizar:
 ### Generación de cuotas
 
 Las cuotas se generan de forma **incremental**: desde el mes de inicio hasta el mes actual, más un mes por delante
-para que "próximos vencimientos" tenga algo que mostrar. Volver a ejecutar la puesta al día **no duplica** cuotas.
-Un contrato finalizado no genera cuotas con vencimiento posterior a su fecha de fin.
+para que "próximos vencimientos" tenga algo que mostrar. Volver a ejecutar la puesta al día **no duplica** cuotas:
+la identidad de una cuota dentro de su contrato es su **período**, de modo que un período que ya tiene cuota no
+genera otra. Un contrato finalizado no genera cuotas con vencimiento posterior a su fecha de fin.
+
+**Finalizar un contrato materializa antes las cuotas que le corresponden hasta la fecha de fin**, y solo después
+aplica la regla 12. Si no se hiciera así, la deuda vencida de un contrato del que nadie ejecutó la puesta al día
+desaparecería sin que nadie la perdonara: la regla 12 decide sobre la serie completa, no sobre las cuotas que
+alguien hubiera generado antes.
 
 ### Decisiones pendientes
 
@@ -191,6 +198,10 @@ Para lograrlo, el acceso a datos ocurre siempre a través de **puertos**, con es
 - Un puerto se define **en la capa que lo necesita**, junto a sus consumidores; no por defecto en el dominio.
 - Los puertos de **persistencia y orquestación** viven en `lib/aplicacion/puertos/`, porque sus únicos
   consumidores son los casos de uso.
+- Un puerto puede **extender a otro más estrecho** cuando el mismo adaptador sirve a ambos, de modo que quien
+  solo necesita la consulta no dependa de la escritura. Caso real: `RepositorioDeContratos` extiende
+  `ContratosActivos`, así que la ocupación de una habitación se responde siempre desde los contratos realmente
+  guardados.
 - La **infraestructura** futura implementará esos puertos; ninguna capa interna conoce a sus implementaciones.
 - El **dominio** no depende de la aplicación ni de la infraestructura: es el núcleo puro al que apuntan todas las
   dependencias.
