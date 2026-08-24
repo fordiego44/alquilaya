@@ -18,6 +18,9 @@ class RepositorioDeCuotasEnMemoria implements RepositorioDeCuotas {
   }
 
   @override
+  Future<Cuota?> obtenerPorId(String id) async => _porId[id];
+
+  @override
   Future<List<Cuota>> deContrato(String contratoId) async =>
       _porId.values.where((cuota) => cuota.contratoId == contratoId).toList();
 
@@ -28,7 +31,6 @@ class RepositorioDeCuotasEnMemoria implements RepositorioDeCuotas {
     }
   }
 
-  /// Solo para los tests: comprobar que un fallo no dejó cuotas sueltas, sin
-  /// tener que saber a qué contrato habrían pertenecido.
+  @override
   Future<List<Cuota>> todas() async => _porId.values.toList();
 }

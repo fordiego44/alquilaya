@@ -101,10 +101,21 @@ llegaría a mostrar totales como `1049.9999999999998`. La conversión entre lo q
 - Registrar el pago de una cuota, siempre por su importe completo.
 
 ### Consultas
-- Pagos **pendientes**.
-- Pagos **vencidos**.
+- Cuotas **pendientes**.
+- Cuotas **vencidas**.
 - **Próximos vencimientos**.
-- **Historial** (por habitación, por contrato o por inquilino).
+- **Historial** por contrato.
+
+*Pendiente* y *vencida* son estados de la **cuota**, no del pago: se derivan de sus pagos y de la fecha actual, de
+modo que la misma cuota se lee distinta en fechas distintas.
+
+**Próximos vencimientos** no es una consulta aparte: son las cuotas **pendientes ordenadas por fecha de
+vencimiento**. La capa de aplicación no impone ventana temporal ni cantidad máxima; devuelve la serie completa y
+es el consumidor quien decide cuántas mostrar.
+
+Las tres consultas son de **solo lectura**: `ListarCuotas`, `ListarContratos` y `ConsultarHistorialDeContrato` no
+generan ni persisten cuotas. Consultar el estado de la vivienda nunca modifica la serie: leer una lista de deuda
+no puede tener el efecto secundario de crear las cuotas que faltaban.
 
 ### Dashboard
 - Resumen del estado: habitaciones ocupadas/disponibles, cobros del período, deuda acumulada.
@@ -161,6 +172,15 @@ genera otra. Un contrato finalizado no genera cuotas con vencimiento posterior a
 aplica la regla 12. Si no se hiciera así, la deuda vencida de un contrato del que nadie ejecutó la puesta al día
 desaparecería sin que nadie la perdonara: la regla 12 decide sobre la serie completa, no sobre las cuotas que
 alguien hubiera generado antes.
+
+La puesta al día es una **operación explícita**, nunca un efecto secundario de consultar. Se ejecuta de dos
+formas, ambas capaces de materializar cuotas:
+
+- `ActualizarCuotasDeContrato`, sobre un contrato concreto.
+- `ActualizarCuotasDeTodosLosContratos`, que recorre la cartera y **procesa únicamente los contratos activos**,
+  reutilizando el caso de uso anterior en lugar de repetir las reglas de fechas (regla 7). Un contrato finalizado
+  se ignora por completo: sus cuotas hasta la fecha de fin ya las materializó `FinalizarContrato` durante el
+  cierre, así que la puesta al día global no tiene nada que reparar ni completar en él.
 
 ### Decisiones pendientes
 

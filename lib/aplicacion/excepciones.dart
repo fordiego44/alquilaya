@@ -33,6 +33,16 @@ class ContratoNoEncontrado implements Exception {
   String toString() => 'No existe el contrato $id';
 }
 
+/// La cuota pedida no existe en el almacén.
+class CuotaNoEncontrada implements Exception {
+  final String id;
+
+  CuotaNoEncontrada(this.id);
+
+  @override
+  String toString() => 'No existe la cuota $id';
+}
+
 /// Regla 1: la habitación ya tiene un contrato activo.
 ///
 /// La regla es de negocio, pero solo es comprobable consultando el almacén, y

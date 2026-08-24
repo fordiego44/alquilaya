@@ -31,8 +31,6 @@ class RepositorioDeContratosEnMemoria implements RepositorioDeContratos {
   Future<bool> tieneContratoActivo(String habitacionId) async => _porId.values
       .any((c) => c.estaActivo && c.habitacionId == habitacionId);
 
-  /// Solo para los tests: el puerto no expone un listado completo porque
-  /// ningún caso de uso lo necesita, pero comprobar que un fallo no dejó nada
-  /// guardado sí lo requiere.
-  Future<List<Contrato>> todos() async => _porId.values.toList();
+  @override
+  Future<List<Contrato>> listar() async => _porId.values.toList();
 }

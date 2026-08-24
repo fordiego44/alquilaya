@@ -47,7 +47,7 @@ void main() {
     });
 
     Future<void> esperarAlmacenVacio() async {
-      expect(await contratos.todos(), isEmpty);
+      expect(await contratos.listar(), isEmpty);
       expect(await cuotas.todas(), isEmpty);
       expect(await pagos.todos(), isEmpty);
     }
@@ -110,7 +110,7 @@ void main() {
       await expectLater(crearSobreH1(), throwsA(isA<HabitacionOcupada>()));
 
       // Sigue existiendo solo el contrato original, con su cuota y su pago.
-      expect(await contratos.todos(), [primero]);
+      expect(await contratos.listar(), [primero]);
       expect(await cuotas.todas(), [cuotaOriginal]);
       final registrados = await pagos.todos();
       expect(registrados, hasLength(1));

@@ -13,4 +13,10 @@ abstract interface class RepositorioDeContratos implements ContratosActivos {
 
   /// Devuelve `null` si no existe.
   Future<Contrato?> obtenerPorId(String id);
+
+  /// Todos los contratos, activos y finalizados. Sin filtros por habitación ni
+  /// por inquilino: quien los necesita los aplica en memoria, que para una
+  /// vivienda es suficiente y evita comprometer al puerto con consultas que
+  /// todavía nadie ha pedido.
+  Future<List<Contrato>> listar();
 }
