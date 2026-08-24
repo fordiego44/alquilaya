@@ -118,7 +118,27 @@ generan ni persisten cuotas. Consultar el estado de la vivienda nunca modifica l
 no puede tener el efecto secundario de crear las cuotas que faltaban.
 
 ### Dashboard
-- Resumen del estado: habitaciones ocupadas/disponibles, cobros del período, deuda acumulada.
+- Resumen del estado: habitaciones ocupadas/disponibles, cobros del período, deuda acumulada y próximos
+  vencimientos.
+
+Lo resuelve `ConsultarDashboard`, también de **solo lectura**: compone consultas existentes y agrega sus
+resultados sin reimplementar reglas de negocio, y **no materializa cuotas**. Si nadie ha ejecutado la puesta al
+día, el resumen muestra menos deuda de la real; actualizar sigue siendo una operación explícita y separada.
+
+Qué significa cada cifra:
+
+- **Ocupadas / disponibles**: se cuentan sobre el listado de habitaciones, donde *ocupada* es siempre "tiene un
+  contrato activo" (regla 1).
+- **Cobros del período**: dinero **recibido** durante ese mes, por **fecha de pago**. Es caja, no devengo: un pago
+  tardío de la cuota de agosto realizado en septiembre cuenta como cobro de septiembre. El período es opcional;
+  por defecto, el mes de la fecha consultada.
+- **Deuda acumulada**: la suma de los montos pendientes de las cuotas **pendientes y vencidas** de toda la
+  cartera, incluida la deuda que la regla 12 conservó de contratos ya finalizados.
+- **Próximos vencimientos**: las cuotas pendientes ordenadas por fecha de vencimiento, con el mismo criterio que
+  el resto de consultas: sin ventana temporal ni cantidad máxima.
+
+Las cifras derivadas de la fecha —deuda y vencimientos— se calculan siempre respecto al día consultado, no
+respecto al período: mirar los cobros de un mes pasado no cambia cuánto se debe hoy.
 
 ## 5. Reglas de negocio
 
