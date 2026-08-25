@@ -222,16 +222,19 @@ Estas reglas están identificadas pero **no cerradas**; se decidirán cuando toq
 
 ## 7. Infraestructura
 
-**No hay infraestructura seleccionada y no debe seleccionarse todavía.**
+**Persistencia local elegida: SQLite, mediante `sqflite`.** `sqflite_common_ffi` es una dependencia **de
+desarrollo** y existe solo para que los tests puedan abrir SQLite fuera de un dispositivo.
 
-Opciones consideradas para el futuro:
+El alcance actual es **únicamente local**: los datos viven en el dispositivo y sobreviven al cierre de la
+aplicación. No hay backend, API remota ni sincronización, y no se ha elegido ninguno todavía. Siguen sobre la mesa
+para más adelante:
 
 - `Flutter -> REST -> Spring Boot -> PostgreSQL`
 - `Flutter -> Supabase -> PostgreSQL`
-- Almacenamiento local como punto de partida
 
 Requisito arquitectónico derivado: la aplicación debe permitir **sustituir el adaptador de persistencia sin tocar
-las reglas de dominio**.
+las reglas de dominio**. La elección de SQLite no lo compromete: los repositorios SQLite implementan los puertos
+**ya existentes**, y añadirlos no obligó a modificar ni el dominio ni la aplicación.
 
 Para lograrlo, el acceso a datos ocurre siempre a través de **puertos**, con estas reglas de ubicación:
 
@@ -242,7 +245,8 @@ Para lograrlo, el acceso a datos ocurre siempre a través de **puertos**, con es
   solo necesita la consulta no dependa de la escritura. Caso real: `RepositorioDeContratos` extiende
   `ContratosActivos`, así que la ocupación de una habitación se responde siempre desde los contratos realmente
   guardados.
-- La **infraestructura** futura implementará esos puertos; ninguna capa interna conoce a sus implementaciones.
+- La **infraestructura** implementa esos puertos, hoy en `lib/infraestructura/persistencia/`; ninguna capa interna
+  conoce a sus implementaciones.
 - El **dominio** no depende de la aplicación ni de la infraestructura: es el núcleo puro al que apuntan todas las
   dependencias.
 
@@ -257,6 +261,69 @@ aplicacion (casos de uso)
     ↓ usa
 dominio
 ```
+
+### Esquema local (versión 1)
+
+Cinco tablas, una por entidad: `habitaciones`, `inquilinos`, `contratos`, `cuotas` y `pagos`. Sus columnas salen
+una a una de las entidades del dominio; no existe ninguna columna que el dominio no tenga.
+
+Cómo se traduce cada tipo:
+
+| Tipo de dominio | En la base |
+|---|---|
+| `Dinero` | `INTEGER`, en **centavos** — nunca un `REAL`, así los totales cuadran al céntimo |
+| `Periodo` | dos `INTEGER`: año y mes |
+| `DateTime` | `TEXT` en **ISO-8601**, con round-trip exacto para las fechas usadas por el dominio |
+| id | `TEXT PRIMARY KEY` |
+| estados derivados | **no se persisten** |
+
+Ni `EstadoCuota` ni el estado de ocupación llegan a la base: son derivados y guardarlos crearía un dato capaz de
+contradecir a los pagos o a los contratos.
+
+Las relaciones —contrato→habitación, contrato→inquilino, cuota→contrato, pago→cuota— son claves foráneas reales,
+activadas con `PRAGMA foreign_keys = ON` en cada conexión.
+
+**El almacenamiento solo protege la integridad estructural**: claves, obligatoriedad y relaciones. Las reglas de
+negocio siguen viviendo exclusivamente en el dominio y la aplicación: monto positivo, un único contrato activo por
+habitación, pago exacto sin parciales ni sobrepagos, conservación al finalizar y calendario de vencimientos. No se
+traducen a `CHECK` ni a índices únicos: quedarían en dos sitios y se desincronizarían. La clave foránea de `pagos`
+no duplica la regla 12, la respalda, convirtiendo un incumplimiento futuro en un error inmediato.
+
+### Escrituras: UPSERT no destructivo
+
+Todos los guardados usan `INSERT ... ON CONFLICT(id) DO UPDATE SET ...`.
+
+**No se usa `INSERT OR REPLACE` ni `ConflictAlgorithm.replace`**: REPLACE resuelve el conflicto *borrando* la fila
+existente antes de reinsertarla, y con las claves foráneas activas eso rompe o arrastra las filas hijas. Ocurriría
+de verdad en dos sitios: al finalizar un contrato que ya tiene cuotas, y al volver a guardar una cuota que ya
+tiene pagos. La invariante es que **actualizar una entidad nunca borra su fila ni pone en riesgo sus relaciones**.
+
+### Transacciones
+
+Las transacciones atómicas **entre varios repositorios quedan fuera del alcance actual**. Los casos de uso que
+escriben varias veces —`CrearContrato`, `FinalizarContrato`— validan todo antes de la primera escritura y guardan
+de menos a más dependiente, de modo que un fallo intermedio exigiría un error del propio SQLite y dejaría datos
+huérfanos recuperables, no inválidos. La aplicación es monousuario y local, sin concurrencia.
+
+El riesgo se acepta a sabiendas: un corte a mitad de una finalización podría dejar un contrato finalizado con
+cuotas posteriores sin depurar. Si llega a importar, se diseñará una abstracción de transacción/unidad de trabajo
+apoyada en `Database.transaction`, evaluando entonces los cambios mínimos necesarios en el cableado o en los
+adaptadores.
+
+### Migraciones
+
+El esquema actual es la **versión 1** y **todavía no hay `onUpgrade`**: sin ninguna versión anterior instalada no
+hay nada que migrar, y escribirlo ahora sería código muerto.
+
+Cuando el esquema cambie hará falta hacer las tres cosas a la vez:
+
+1. incrementar `version`;
+2. añadir la rama correspondiente en `onUpgrade`, que migra las instalaciones **existentes**;
+3. **actualizar también `onCreate`**, que debe crear directamente el esquema más reciente.
+
+`onCreate` describe siempre el esquema vigente, nunca el histórico: una instalación nueva no dispara `onUpgrade`,
+así que si se congelara nacería con un esquema antiguo. Los dos caminos —instalación nueva y actualización— tienen
+que converger en el mismo esquema.
 
 ## 8. Glosario
 
