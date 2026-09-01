@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import '../../aplicacion/cuotas/listar_cuotas_para_cobro.dart';
 import '../../aplicacion/dashboard/consultar_dashboard.dart';
 import '../../composicion.dart';
-import '../../dominio/entidades/cuota.dart';
 import '../comun/error_con_reintento.dart';
 import '../comun/mensajes.dart';
 
@@ -165,7 +164,7 @@ class _PantallaDashboardState extends State<PantallaDashboard> {
                 // La lista llega ordenada por fecha de cobro y ya filtrada a lo
                 // que aún no toca cobrar: se muestra tal cual.
                 for (final cuota in resumen.proximosCobros)
-                  _FilaDeVencimiento(cuota),
+                  _FilaDeCobro(cuota),
             ],
           );
         },
@@ -228,20 +227,18 @@ class _Cifra extends StatelessWidget {
   }
 }
 
-class _FilaDeVencimiento extends StatelessWidget {
+class _FilaDeCobro extends StatelessWidget {
   final CuotaParaCobro cuota;
 
-  const _FilaDeVencimiento(this.cuota);
+  const _FilaDeCobro(this.cuota);
 
   @override
   Widget build(BuildContext context) {
     final colores = Theme.of(context).colorScheme;
     final derivada = cuota.cuota;
-    final color = switch (derivada.estado) {
-      EstadoCuota.pagada => colores.primary,
-      EstadoCuota.vencida => colores.error,
-      EstadoCuota.pendiente => colores.outline,
-    };
+    // `proximosCobros` solo trae cuotas pendientes: no hay más estado que
+    // pintar.
+    final color = colores.outline;
 
     return ListTile(
       contentPadding: EdgeInsets.zero,
