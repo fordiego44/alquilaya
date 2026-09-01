@@ -112,23 +112,22 @@ Las **salidas programadas** —anotar por adelantado que un inquilino se marchar
 ### Consultas
 - Cuotas **pendientes**.
 - Cuotas **vencidas**.
-- **Próximos vencimientos**.
+- **Próximos cobros**.
 - **Historial** por contrato.
 
 *Pendiente* y *vencida* son estados de la **cuota**, no del pago: se derivan de sus pagos y de la fecha actual, de
 modo que la misma cuota se lee distinta en fechas distintas.
 
-**Próximos vencimientos** no es una consulta aparte: son las cuotas **pendientes ordenadas por fecha de
-vencimiento**. La capa de aplicación no impone ventana temporal ni cantidad máxima; devuelve la serie completa y
-es el consumidor quien decide cuántas mostrar.
+**Próximos cobros** no es una consulta aparte: son las cuotas **pendientes ordenadas por fecha de cobro**. La capa
+de aplicación no impone ventana temporal ni cantidad máxima; devuelve la serie completa y es el consumidor quien
+decide cuántas mostrar.
 
 Las tres consultas son de **solo lectura**: `ListarCuotas`, `ListarContratos` y `ConsultarHistorialDeContrato` no
 generan ni persisten cuotas. Consultar el estado de la vivienda nunca modifica la serie: leer una lista de deuda
 no puede tener el efecto secundario de crear las cuotas que faltaban.
 
 ### Dashboard
-- Resumen del estado: habitaciones ocupadas/disponibles, cobros del período, deuda acumulada y próximos
-  vencimientos.
+- Resumen del estado: habitaciones ocupadas/disponibles, cobros del período, deuda vencida y próximos cobros.
 
 Lo resuelve `ConsultarDashboard`, también de **solo lectura**: compone consultas existentes y agrega sus
 resultados sin reimplementar reglas de negocio, y **no materializa cuotas**. Si nadie ha ejecutado la puesta al
@@ -141,12 +140,20 @@ Qué significa cada cifra:
 - **Cobros del período**: dinero **recibido** durante ese mes, por **fecha de pago**. Es caja, no devengo: un pago
   tardío de la cuota de agosto realizado en septiembre cuenta como cobro de septiembre. El período es opcional;
   por defecto, el mes de la fecha consultada.
-- **Deuda acumulada**: la suma de los montos pendientes de las cuotas **pendientes y vencidas** de toda la
-  cartera, incluida la deuda que la regla 12 conservó de contratos ya finalizados.
-- **Próximos vencimientos**: las cuotas pendientes ordenadas por fecha de vencimiento, con el mismo criterio que
-  el resto de consultas: sin ventana temporal ni cantidad máxima.
+- **Deuda vencida**: la suma de los montos pendientes de las cuotas **vencidas e impagas** de toda la cartera,
+  incluida la deuda que la regla 12 conservó de contratos ya finalizados. No incluye lo que aún no toca cobrar:
+  mezclarlo haría parecer moroso a un inquilino que está al día.
+- **Próximos cobros**: las cuotas **pendientes** ordenadas por fecha de cobro, con el mismo criterio que el resto
+  de consultas: sin ventana temporal ni cantidad máxima. Traen además a quién y dónde cobrar, para que el panel
+  sirva sin abrir otra pantalla.
 
-Las cifras derivadas de la fecha —deuda y vencimientos— se calculan siempre respecto al día consultado, no
+Una cuota cuya fecha de cobro **es hoy sigue siendo pendiente**, no vencida: el día del vencimiento aún no cuenta
+como vencido (regla 6). Aparece por tanto en *próximos cobros* y no en *deuda vencida*.
+
+Ambas cifras son **excluyentes**: cada cuota cae en un único sitio —vencida, por cobrar o saldada—, de modo que no
+hay doble conteo entre la deuda y los próximos cobros.
+
+Las cifras derivadas de la fecha —deuda vencida y próximos cobros— se calculan siempre respecto al día consultado, no
 respecto al período: mirar los cobros de un mes pasado no cambia cuánto se debe hoy.
 
 ## 5. Reglas de negocio
@@ -334,7 +341,55 @@ Cuando el esquema cambie hará falta hacer las tres cosas a la vez:
 así que si se congelara nacería con un esquema antiguo. Los dos caminos —instalación nueva y actualización— tienen
 que converger en el mismo esquema.
 
-## 8. Glosario
+## 8. Estado actual
+
+Estado validado al **01/09/2026**. Esta sección describe lo que **ya funciona**, no lo planificado.
+
+### Interfaz
+
+El MVP tiene interfaz Flutter funcional, con cinco destinos de navegación y una pantalla de detalle:
+
+- **Inicio / Dashboard** — resumen del estado y puesta al día explícita de cuotas.
+- **Cuotas** — listado con su estado y registro de pagos.
+- **Contratos** — creación, finalización y acceso al historial.
+- **Habitaciones** — registro y estado de ocupación.
+- **Inquilinos** — registro y datos de contacto.
+- **Historial de contrato** — cuotas y pagos de un contrato concreto.
+
+### Persistencia local
+
+SQLite funcionando en Android mediante `sqflite`. **Habitaciones, inquilinos, contratos, cuotas y pagos
+persisten** en el dispositivo. Se verificó cerrar por completo la aplicación y volver a abrirla sin pérdida de
+datos.
+
+### Flujo validado manualmente
+
+Recorrido completo probado en el emulador Android S24:
+
+1. crear una habitación;
+2. crear un inquilino;
+3. crear un contrato sobre la habitación disponible;
+4. pago inicial por adelantado, registrado en el mismo acto (regla 9);
+5. generación de las cuotas mensuales siguientes;
+6. registrar un pago;
+7. finalizar el contrato;
+8. la habitación vuelve a quedar **disponible**;
+9. el historial conserva cuotas y pagos (regla 3).
+
+### Calidad
+
+- `flutter analyze`: **limpio**, sin incidencias.
+- `flutter test`: **203 pruebas, todas en verde**.
+- Prueba funcional completa del MVP realizada en el emulador Android S24.
+
+### Límites de esta versión
+
+- **MVP funcional local**: sin backend, sin sincronización remota y sin autenticación.
+- Los datos viven **únicamente en el dispositivo**.
+- El package Android es `com.example.alquilaya`, el valor por defecto de Flutter. **Debe cambiarse antes de
+  cualquier publicación real.**
+
+## 9. Glosario
 
 - **Día base de cobro**: día del mes en que vencen las cuotas de un contrato. Es el día de su fecha de inicio.
 - **Cuota**: obligación mensual de pago generada por un contrato para un período concreto.
