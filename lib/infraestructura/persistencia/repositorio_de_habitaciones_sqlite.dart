@@ -20,10 +20,13 @@ class RepositorioDeHabitacionesSqlite implements RepositorioDeHabitaciones {
   @override
   Future<void> guardar(Habitacion habitacion) => _db.execute(
     '''
-    INSERT INTO habitaciones (id, nombre) VALUES (?, ?)
-    ON CONFLICT(id) DO UPDATE SET nombre = excluded.nombre
+    INSERT INTO habitaciones (id, nombre, archivada) VALUES (?, ?, ?)
+    ON CONFLICT(id) DO UPDATE SET
+      nombre    = excluded.nombre,
+      archivada = excluded.archivada
     ''',
-    [habitacion.id, habitacion.nombre],
+    // SQLite no tiene booleano: 0/1, como el resto de la base.
+    [habitacion.id, habitacion.nombre, habitacion.archivada ? 1 : 0],
   );
 
   @override
@@ -41,8 +44,23 @@ class RepositorioDeHabitacionesSqlite implements RepositorioDeHabitaciones {
   Future<List<Habitacion>> listar() async =>
       (await _db.query('habitaciones')).map(_desdeFila).toList();
 
+  /// Borra la fila con [id]. Un id inexistente no es un error: un `DELETE` que
+  /// no afecta a ninguna fila es un no-op, que es justo lo que pide el puerto.
+  ///
+  /// **Sin CASCADE en ninguna parte.** Si un contrato referencia esta
+  /// habitación, la clave foránea rechaza el borrado y sqflite lanza
+  /// `DatabaseException`. Es la barrera de último recurso: el caso de uso
+  /// comprueba antes y da un mensaje comprensible, pero si alguna vez se
+  /// olvidara, el historial sigue sin poder romperse.
+  @override
+  Future<void> eliminar(String id) =>
+      _db.delete('habitaciones', where: 'id = ?', whereArgs: [id]);
+
   /// Reconstruye por el constructor del dominio, no por un atajo: así una fila
   /// corrupta falla al leerse y no más adelante.
-  Habitacion _desdeFila(Map<String, Object?> fila) =>
-      Habitacion(id: fila['id'] as String, nombre: fila['nombre'] as String);
+  Habitacion _desdeFila(Map<String, Object?> fila) => Habitacion(
+    id: fila['id'] as String,
+    nombre: fila['nombre'] as String,
+    archivada: (fila['archivada'] as int) == 1,
+  );
 }

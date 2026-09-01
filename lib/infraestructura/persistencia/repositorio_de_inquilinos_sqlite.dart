@@ -17,14 +17,21 @@ class RepositorioDeInquilinosSqlite implements RepositorioDeInquilinos {
   @override
   Future<void> guardar(Inquilino inquilino) => _db.execute(
     '''
-    INSERT INTO inquilinos (id, nombre, documento, telefono)
-    VALUES (?, ?, ?, ?)
+    INSERT INTO inquilinos (id, nombre, documento, telefono, archivado)
+    VALUES (?, ?, ?, ?, ?)
     ON CONFLICT(id) DO UPDATE SET
       nombre    = excluded.nombre,
       documento = excluded.documento,
-      telefono  = excluded.telefono
+      telefono  = excluded.telefono,
+      archivado = excluded.archivado
     ''',
-    [inquilino.id, inquilino.nombre, inquilino.documento, inquilino.telefono],
+    [
+      inquilino.id,
+      inquilino.nombre,
+      inquilino.documento,
+      inquilino.telefono,
+      inquilino.archivado ? 1 : 0,
+    ],
   );
 
   @override
@@ -42,10 +49,20 @@ class RepositorioDeInquilinosSqlite implements RepositorioDeInquilinos {
   Future<List<Inquilino>> listar() async =>
       (await _db.query('inquilinos')).map(_desdeFila).toList();
 
+  /// Borra la fila con [id]; un id inexistente es un no-op.
+  ///
+  /// Sin CASCADE: un inquilino referenciado por algún contrato no puede
+  /// borrarse, y la clave foránea lo impide aunque el caso de uso fallara en
+  /// comprobarlo.
+  @override
+  Future<void> eliminar(String id) =>
+      _db.delete('inquilinos', where: 'id = ?', whereArgs: [id]);
+
   Inquilino _desdeFila(Map<String, Object?> fila) => Inquilino(
     id: fila['id'] as String,
     nombre: fila['nombre'] as String,
     documento: fila['documento'] as String?,
     telefono: fila['telefono'] as String?,
+    archivado: (fila['archivado'] as int) == 1,
   );
 }

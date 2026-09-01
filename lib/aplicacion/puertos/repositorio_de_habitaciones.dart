@@ -13,4 +13,14 @@ abstract interface class RepositorioDeHabitaciones {
   Future<Habitacion?> obtenerPorId(String id);
 
   Future<List<Habitacion>> listar();
+
+  /// Borra la habitación con [id]. Si no existe, no hace nada: repetir la
+  /// llamada no es un error.
+  ///
+  /// El puerto **no comprueba si algo la referencia**: "no se puede borrar una
+  /// habitación con contratos" es una regla de negocio y vive en el caso de
+  /// uso, que es quien ve los contratos. Un adaptador con integridad
+  /// referencial puede además rechazar el borrado por su cuenta, y esa segunda
+  /// barrera es deliberada: la regla no depende de que alguien la recuerde.
+  Future<void> eliminar(String id);
 }

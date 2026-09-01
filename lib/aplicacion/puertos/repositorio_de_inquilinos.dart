@@ -10,4 +10,11 @@ abstract interface class RepositorioDeInquilinos {
   Future<Inquilino?> obtenerPorId(String id);
 
   Future<List<Inquilino>> listar();
+
+  /// Borra el inquilino con [id]. Si no existe, no hace nada.
+  ///
+  /// Igual que en habitaciones, el puerto no sabe nada de contratos: quién
+  /// puede borrarse lo decide el caso de uso, y un adaptador con claves
+  /// foráneas lo respalda rechazando el borrado de un inquilino referenciado.
+  Future<void> eliminar(String id);
 }

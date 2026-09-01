@@ -23,4 +23,13 @@ class RepositorioDeHabitacionesEnMemoria implements RepositorioDeHabitaciones {
 
   @override
   Future<List<Habitacion>> listar() async => _porId.values.toList();
+
+  /// Borrar lo que no está no falla, igual que describe el puerto. Este doble
+  /// **no imita la integridad referencial** de una base real: quien necesite
+  /// comprobar que una habitación con contratos no puede borrarse, lo prueba
+  /// contra el adaptador SQLite.
+  @override
+  Future<void> eliminar(String id) async {
+    _porId.remove(id);
+  }
 }

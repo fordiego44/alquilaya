@@ -1,7 +1,9 @@
 import 'package:sqflite/sqflite.dart';
 
 /// Versión del esquema. Se incrementa cuando cambia la forma de las tablas.
-const int versionDelEsquema = 1;
+///
+/// La v2 añadió el archivado de habitaciones e inquilinos.
+const int versionDelEsquema = 2;
 
 /// Abre —creándola si hace falta— la base de datos local en [ruta].
 ///
@@ -18,6 +20,7 @@ Future<Database> abrirBaseDeDatos({required String ruta}) => openDatabase(
   version: versionDelEsquema,
   onConfigure: _configurar,
   onCreate: _crearEsquema,
+  onUpgrade: _migrar,
 );
 
 /// Las claves foráneas no están activas por defecto en SQLite: hay que pedirlas
@@ -29,13 +32,9 @@ Future<void> _configurar(Database db) =>
 ///
 /// Una instalación nueva nunca ejecuta `onUpgrade`, así que este método tiene
 /// que quedarse siempre al día: cuando el esquema cambie hay que subir
-/// [versionDelEsquema], añadir la rama correspondiente en un `onUpgrade` que
-/// migre las bases ya instaladas **y** actualizar también estas sentencias. Los
-/// dos caminos —instalación nueva y actualización— deben terminar en el mismo
-/// esquema.
-///
-/// Mientras la app no esté distribuida no hay bases que migrar: el esquema se
-/// puede seguir cambiando dentro de la v1 borrando la base local.
+/// [versionDelEsquema], añadir la rama correspondiente en [_migrar] **y**
+/// actualizar también estas sentencias. Los dos caminos —instalación nueva y
+/// actualización— deben terminar en el mismo esquema.
 Future<void> _crearEsquema(Database db, int version) async {
   // Las restricciones que viven aquí son estructurales: claves, obligatoriedad
   // y relaciones. Las reglas de negocio —monto positivo, un solo contrato
@@ -44,8 +43,9 @@ Future<void> _crearEsquema(Database db, int version) async {
   // las pondría en dos sitios que se desincronizarían.
   await db.execute('''
     CREATE TABLE habitaciones (
-      id      TEXT PRIMARY KEY,
-      nombre  TEXT NOT NULL
+      id         TEXT PRIMARY KEY,
+      nombre     TEXT NOT NULL,
+      archivada  INTEGER NOT NULL DEFAULT 0
     )
   ''');
 
@@ -56,7 +56,8 @@ Future<void> _crearEsquema(Database db, int version) async {
       id         TEXT PRIMARY KEY,
       nombre     TEXT NOT NULL,
       documento  TEXT,
-      telefono   TEXT
+      telefono   TEXT,
+      archivado  INTEGER NOT NULL DEFAULT 0
     )
   ''');
 
@@ -96,4 +97,24 @@ Future<void> _crearEsquema(Database db, int version) async {
       fecha_pago      TEXT NOT NULL
     )
   ''');
+}
+
+/// Pone al día una base **ya instalada** hasta [versionDelEsquema].
+///
+/// Un bloque por salto, en orden y sin `else`: una base en v1 los recorre todos
+/// hasta quedar al día. Cuando exista una v3 se añade aquí su propio
+/// `if (versionAnterior < 3)` sin tocar los anteriores.
+Future<void> _migrar(Database db, int versionAnterior, int versionNueva) async {
+  if (versionAnterior < 2) {
+    // `ADD COLUMN` con DEFAULT rellena las filas que ya existen sin reescribir
+    // la tabla ni tocar sus claves foráneas: lo que había queda como activo.
+    await db.execute(
+      'ALTER TABLE habitaciones '
+      'ADD COLUMN archivada INTEGER NOT NULL DEFAULT 0',
+    );
+    await db.execute(
+      'ALTER TABLE inquilinos '
+      'ADD COLUMN archivado INTEGER NOT NULL DEFAULT 0',
+    );
+  }
 }

@@ -20,4 +20,11 @@ class RepositorioDeInquilinosEnMemoria implements RepositorioDeInquilinos {
 
   @override
   Future<List<Inquilino>> listar() async => _porId.values.toList();
+
+  /// Borrar un id inexistente no falla. Sin integridad referencial, como el
+  /// doble de habitaciones.
+  @override
+  Future<void> eliminar(String id) async {
+    _porId.remove(id);
+  }
 }

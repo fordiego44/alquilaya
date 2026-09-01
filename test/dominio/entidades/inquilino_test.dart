@@ -35,5 +35,44 @@ void main() {
         isNot(Inquilino(id: 'i2', nombre: 'Ana')),
       );
     });
+
+    test('un inquilino nuevo no está archivado', () {
+      expect(Inquilino(id: 'i1', nombre: 'Ana').archivado, isFalse);
+    });
+
+    test('archivar devuelve una copia archivada sin tocar el original', () {
+      final original = Inquilino(
+        id: 'i1',
+        nombre: 'Ana',
+        documento: '12345678',
+        telefono: '951234567',
+      );
+
+      final archivado = original.archivar();
+
+      expect(original.archivado, isFalse);
+      expect(archivado.archivado, isTrue);
+      // El resto de los datos viaja intacto: archivar no edita.
+      expect(archivado.nombre, 'Ana');
+      expect(archivado.documento, '12345678');
+      expect(archivado.telefono, '951234567');
+    });
+
+    test('reactivar devuelve una copia activa', () {
+      final archivado = Inquilino(id: 'i1', nombre: 'Ana').archivar();
+      expect(archivado.reactivar().archivado, isFalse);
+    });
+
+    test('archivar dos veces no falla y sigue archivado', () {
+      expect(
+        Inquilino(id: 'i1', nombre: 'Ana').archivar().archivar().archivado,
+        isTrue,
+      );
+    });
+
+    test('archivar no cambia la identidad', () {
+      final original = Inquilino(id: 'i1', nombre: 'Ana');
+      expect(original.archivar(), original);
+    });
   });
 }
