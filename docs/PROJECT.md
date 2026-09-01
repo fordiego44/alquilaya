@@ -96,6 +96,15 @@ llegaría a mostrar totales como `1049.9999999999998`. La conversión entre lo q
 - Registrar el **pago inicial** de la primera cuota en el mismo acto de creación (regla 9).
 - **Finalizar** un contrato conservando su historial (regla 12).
 
+Finalizar registra una salida que **ya ocurrió**. La fecha de fin puede ser hoy o una fecha pasada —siempre que no
+sea anterior al inicio del contrato—, pero **nunca una fecha futura**: la aplicación la rechaza.
+
+El motivo es que el estado del contrato se deriva de si tiene fecha de fin, no de compararla con hoy. Admitir una
+fecha futura dejaría la habitación como disponible antes de que el inquilino se haya ido, y permitiría crear otro
+contrato solapado sobre ella.
+
+Las **salidas programadas** —anotar por adelantado que un inquilino se marchará— quedan fuera del alcance actual.
+
 ### Cuotas y pagos
 - Generar y controlar las cuotas mensuales del contrato.
 - Registrar el pago de una cuota, siempre por su importe completo.

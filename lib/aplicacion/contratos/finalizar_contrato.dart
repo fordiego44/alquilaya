@@ -24,13 +24,26 @@ class FinalizarContrato {
     this._actualizarCuotas,
   );
 
+  /// [hoy] hace falta porque finalizar significa que la salida **ya ocurrió**:
+  /// sin saber qué día es, no se puede comprobar.
   Future<Contrato> ejecutar({
     required String contratoId,
     required DateTime fechaFin,
+    required DateTime hoy,
   }) async {
     final contrato = await _contratos.obtenerPorId(contratoId);
     if (contrato == null) {
       throw ContratoNoEncontrado(contratoId);
+    }
+
+    // Se comprueba **antes de escribir nada**: si se rechaza, el contrato sigue
+    // activo, su habitación sigue ocupada y ni las cuotas ni los pagos se
+    // tocan.
+    //
+    // La comparación es por día, así que la hora no cuenta: finalizar "hoy"
+    // vale sea cual sea el momento en que se registre.
+    if (_soloDia(fechaFin).isAfter(_soloDia(hoy))) {
+      throw FechaDeFinFutura(fechaFin, hoy);
     }
 
     // El dominio rechaza finalizar dos veces o con una fecha anterior al
@@ -57,3 +70,6 @@ class FinalizarContrato {
     return finalizado;
   }
 }
+
+DateTime _soloDia(DateTime fecha) =>
+    DateTime(fecha.year, fecha.month, fecha.day);

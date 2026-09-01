@@ -1,30 +1,39 @@
 import 'package:alquilaya/aplicacion/cuotas/listar_cuotas.dart';
+import 'package:alquilaya/aplicacion/cuotas/listar_cuotas_para_cobro.dart';
 import 'package:alquilaya/aplicacion/dashboard/consultar_dashboard.dart';
 import 'package:alquilaya/aplicacion/habitaciones/listar_habitaciones.dart';
+import 'package:alquilaya/dominio/entidades/contrato.dart';
 import 'package:alquilaya/dominio/entidades/cuota.dart';
 import 'package:alquilaya/dominio/entidades/habitacion.dart';
+import 'package:alquilaya/dominio/entidades/inquilino.dart';
 import 'package:alquilaya/dominio/entidades/pago.dart';
 import 'package:alquilaya/dominio/valores/dinero.dart';
 import 'package:alquilaya/dominio/valores/periodo.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import '../../dobles/contratos_activos_falsos.dart';
+import '../../dobles/repositorio_de_contratos_en_memoria.dart';
 import '../../dobles/repositorio_de_cuotas_en_memoria.dart';
 import '../../dobles/repositorio_de_habitaciones_en_memoria.dart';
+import '../../dobles/repositorio_de_inquilinos_en_memoria.dart';
 import '../../dobles/repositorio_de_pagos_en_memoria.dart';
 
 void main() {
   group('ConsultarDashboard', () {
     final monto = Dinero(35000);
+    final inicio = DateTime(2026, 8, 20);
 
-    /// Vivienda de dos habitaciones, h1 ocupada por el contrato c1.
+    /// Vivienda de dos habitaciones. Juan Pérez sigue en la h1 con el contrato
+    /// c1; Ana Torres estuvo en la h2 con el c2, ya finalizado, así que esa
+    /// habitación está libre. La ocupación se deriva de los contratos reales,
+    /// como en producción.
     ///
     /// Cuotas de c1: agosto pagada (tarde), septiembre vencida e impaga,
     /// octubre pagada por adelantado, noviembre y diciembre pendientes.
     /// El contrato c2 aporta una cuota de octubre pagada, para que los cobros
     /// del mes crucen más de un contrato.
     ///
-    /// A 5 de octubre de 2026: deuda = septiembre + noviembre + diciembre.
+    /// A 5 de octubre de 2026: deudaVencida = septiembre; proximosCobros =
+    /// noviembre y diciembre.
     late RepositorioDeCuotasEnMemoria cuotas;
     late RepositorioDePagosEnMemoria pagos;
     late ConsultarDashboard consultar;
@@ -42,20 +51,48 @@ void main() {
     Pago pago(String id, String cuotaId, DateTime fechaPago) =>
         Pago(id: id, cuotaId: cuotaId, monto: monto, fechaPago: fechaPago);
 
+    Contrato contrato(
+      String id,
+      String habitacionId,
+      String inquilinoId, {
+      DateTime? fechaFin,
+    }) => Contrato(
+      id: id,
+      habitacionId: habitacionId,
+      inquilinoId: inquilinoId,
+      fechaInicio: inicio,
+      montoMensual: monto,
+      fechaFin: fechaFin,
+    );
+
     ConsultarDashboard dashboardCon({
       required List<Habitacion> habitaciones,
-      required Set<String> ocupadas,
+      required List<Inquilino> inquilinos,
+      required List<Contrato> contratos,
       required List<Cuota> cuotasIniciales,
       required List<Pago> pagosIniciales,
     }) {
       cuotas = RepositorioDeCuotasEnMemoria(cuotasIniciales);
       pagos = RepositorioDePagosEnMemoria(pagosIniciales);
+      final repoHabitaciones = RepositorioDeHabitacionesEnMemoria(habitaciones);
+      final repoInquilinos = RepositorioDeInquilinosEnMemoria(inquilinos);
+      final repoContratos = RepositorioDeContratosEnMemoria(contratos);
+
+      final listarHabitaciones = ListarHabitaciones(
+        repoHabitaciones,
+        repoContratos,
+      );
+      final listarCuotas = ListarCuotas(cuotas, pagos);
+      final listarCuotasParaCobro = ListarCuotasParaCobro(
+        listarCuotas,
+        repoContratos,
+        repoHabitaciones,
+        repoInquilinos,
+      );
+
       return ConsultarDashboard(
-        ListarHabitaciones(
-          RepositorioDeHabitacionesEnMemoria(habitaciones),
-          ContratosActivosFalsos(ocupadas),
-        ),
-        ListarCuotas(cuotas, pagos),
+        listarHabitaciones,
+        listarCuotasParaCobro,
         pagos,
       );
     }
@@ -66,7 +103,16 @@ void main() {
           Habitacion(id: 'h1', nombre: 'Habitación 1'),
           Habitacion(id: 'h2', nombre: 'Habitación 2'),
         ],
-        ocupadas: {'h1'},
+        inquilinos: [
+          Inquilino(id: 'i1', nombre: 'Juan Pérez', telefono: '951234567'),
+          Inquilino(id: 'i2', nombre: 'Ana Torres'),
+        ],
+        contratos: [
+          contrato('c1', 'h1', 'i1'),
+          // Finalizado antes de cualquier `hoy` de estos tests, como exige la
+          // aplicación: la h2 vuelve a estar disponible.
+          contrato('c2', 'h2', 'i2', fechaFin: DateTime(2026, 8, 31)),
+        ],
         cuotasIniciales: [
           cuota('cu1', 'c1', 8),
           cuota('cu2', 'c1', 9),
@@ -123,7 +169,7 @@ void main() {
       expect(resumen.cobrosDelPeriodo, Dinero(70000));
     });
 
-    test('consultar otro período no altera la deuda ni los vencimientos',
+    test('consultar otro período no altera la deuda ni los próximos cobros',
         () async {
       final octubre = await consultar.ejecutar(hoy: hoy);
       final septiembre = await consultar.ejecutar(
@@ -133,40 +179,77 @@ void main() {
 
       // Mirar los cobros de un mes pasado no cambia cuánto se debe hoy.
       expect(septiembre.periodo, Periodo(2026, 9));
-      expect(septiembre.deudaAcumulada, octubre.deudaAcumulada);
+      expect(septiembre.deudaVencida, octubre.deudaVencida);
       expect(
-        septiembre.proximosVencimientos.map((c) => c.cuota.id),
-        octubre.proximosVencimientos.map((c) => c.cuota.id),
+        septiembre.proximosCobros.map((c) => c.cuota.cuota.id),
+        octubre.proximosCobros.map((c) => c.cuota.cuota.id),
       );
     });
 
-    test('la deuda suma las cuotas vencidas y pendientes, no las pagadas',
+    test('la deuda vencida suma solo las cuotas vencidas',
         () async {
       final resumen = await consultar.ejecutar(hoy: hoy);
 
-      // cu2 vencida + cu4 y cu5 pendientes; cu1, cu3 y cu6 están pagadas.
-      expect(resumen.deudaAcumulada, Dinero(105000));
+      // Solo cu2 está vencida. cu4 y cu5 aún no toca cobrarlas y cu1, cu3 y
+      // cu6 están pagadas: ninguna suma aquí.
+      expect(resumen.deudaVencida, Dinero(35000));
     });
 
-    test('próximos vencimientos: solo pendientes, por fecha de vencimiento',
-        () async {
+    test('próximos cobros: solo pendientes, por fecha de cobro', () async {
       final resumen = await consultar.ejecutar(hoy: hoy);
 
-      // cu2 está vencida y no cuenta como próximo vencimiento.
-      expect(resumen.proximosVencimientos.map((c) => c.cuota.id), [
+      // cu2 está vencida y no cuenta como próximo cobro.
+      expect(resumen.proximosCobros.map((c) => c.cuota.cuota.id), [
         'cu4',
         'cu5',
       ]);
       expect(
-        resumen.proximosVencimientos.map((c) => c.estado),
+        resumen.proximosCobros.map((c) => c.cuota.estado),
         everyElement(EstadoCuota.pendiente),
       );
+    });
+
+    test('cada cobro dice a quién cobrar y en qué habitación', () async {
+      final resumen = await consultar.ejecutar(hoy: hoy);
+
+      // cu4 y cu5 son del contrato c1: Juan Pérez, en la habitación 1.
+      expect(
+        resumen.proximosCobros.map((c) => c.nombreInquilino),
+        everyElement('Juan Pérez'),
+      );
+      expect(
+        resumen.proximosCobros.map((c) => c.nombreHabitacion),
+        everyElement('Habitación 1'),
+      );
+      expect(
+        resumen.proximosCobros.map((c) => c.telefono),
+        everyElement('951234567'),
+      );
+    });
+
+    test('un inquilino sin teléfono llega con null', () async {
+      // Ana Torres no tiene teléfono; su cuota de noviembre sigue pendiente.
+      final dashboard = dashboardCon(
+        habitaciones: [Habitacion(id: 'h2', nombre: 'Habitación 2')],
+        inquilinos: [Inquilino(id: 'i2', nombre: 'Ana Torres')],
+        contratos: [contrato('c2', 'h2', 'i2')],
+        cuotasIniciales: [cuota('cu7', 'c2', 11)],
+        pagosIniciales: const [],
+      );
+
+      final resumen = await dashboard.ejecutar(hoy: hoy);
+
+      final vencimiento = resumen.proximosCobros.single;
+      expect(vencimiento.nombreInquilino, 'Ana Torres');
+      expect(vencimiento.nombreHabitacion, 'Habitación 2');
+      expect(vencimiento.telefono, isNull);
     });
 
     test('sin datos devuelve ceros y listas vacías', () async {
       final vacio = dashboardCon(
         habitaciones: const [],
-        ocupadas: const {},
+        inquilinos: const [],
+        contratos: const [],
         cuotasIniciales: const [],
         pagosIniciales: const [],
       );
@@ -176,8 +259,8 @@ void main() {
       expect(resumen.habitacionesOcupadas, 0);
       expect(resumen.habitacionesDisponibles, 0);
       expect(resumen.cobrosDelPeriodo, Dinero.cero);
-      expect(resumen.deudaAcumulada, Dinero.cero);
-      expect(resumen.proximosVencimientos, isEmpty);
+      expect(resumen.deudaVencida, Dinero.cero);
+      expect(resumen.proximosCobros, isEmpty);
     });
 
     test('es de solo lectura: no materializa cuotas ni escribe pagos',

@@ -23,6 +23,11 @@ void main() {
     final montoMensual = Dinero(35000);
     final inicio = DateTime(2026, 8, 20); // día base de cobro: 20
 
+    /// Fecha desde la que se finaliza en estos tests. Es posterior a todas las
+    /// fechas de fin que usan, para que ninguna sea futura; se pasa explícita y
+    /// nunca `DateTime.now()`, de modo que el resultado no dependa del reloj.
+    final hoy = DateTime(2026, 12, 1);
+
     late RepositorioDeContratosEnMemoria contratos;
     late RepositorioDeCuotasEnMemoria cuotas;
     late RepositorioDePagosEnMemoria pagos;
@@ -73,6 +78,7 @@ void main() {
       final finalizado = await finalizar.ejecutar(
         contratoId: contrato.id,
         fechaFin: DateTime(2026, 11, 20),
+        hoy: hoy,
       );
 
       expect(finalizado.estaActivo, isFalse);
@@ -86,6 +92,7 @@ void main() {
       await finalizar.ejecutar(
         contratoId: contrato.id,
         fechaFin: DateTime(2026, 11, 20),
+        hoy: hoy,
       );
 
       final listado = await ListarHabitaciones(habitaciones, contratos)
@@ -101,6 +108,7 @@ void main() {
       await finalizar.ejecutar(
         contratoId: contrato.id,
         fechaFin: DateTime(2026, 11, 20),
+        hoy: hoy,
       );
 
       // Septiembre, octubre y noviembre se conservan como deuda impaga.
@@ -119,6 +127,7 @@ void main() {
       await finalizar.ejecutar(
         contratoId: contrato.id,
         fechaFin: DateTime(2026, 11, 15),
+        hoy: hoy,
       );
 
       // La de noviembre vencía el 20: aún no correspondía.
@@ -134,7 +143,11 @@ void main() {
       final contrato = await contratoRecienCreado();
       final fechaFin = DateTime(2026, 11, 20);
 
-      await finalizar.ejecutar(contratoId: contrato.id, fechaFin: fechaFin);
+      await finalizar.ejecutar(
+        contratoId: contrato.id,
+        fechaFin: fechaFin,
+        hoy: hoy,
+      );
 
       expect(
         await vencimientosDe(contrato.id),
@@ -155,6 +168,7 @@ void main() {
       await finalizar.ejecutar(
         contratoId: contrato.id,
         fechaFin: DateTime(2026, 11, 20),
+        hoy: hoy,
       );
 
       // La de diciembre sobraba y se elimina; las demás son las mismas.
@@ -175,6 +189,7 @@ void main() {
       await finalizar.ejecutar(
         contratoId: contrato.id,
         fechaFin: DateTime(2026, 10, 15),
+        hoy: hoy,
       );
 
       expect(await vencimientosDe(contrato.id), [
@@ -205,6 +220,7 @@ void main() {
       await finalizar.ejecutar(
         contratoId: contrato.id,
         fechaFin: DateTime(2026, 10, 15),
+        hoy: hoy,
       );
 
       expect(await vencimientosDe(contrato.id), contains(DateTime(2026, 10, 20)));
@@ -217,6 +233,7 @@ void main() {
       await finalizar.ejecutar(
         contratoId: contrato.id,
         fechaFin: DateTime(2026, 10, 20),
+        hoy: hoy,
       );
 
       expect(
@@ -231,6 +248,7 @@ void main() {
       await finalizar.ejecutar(
         contratoId: contrato.id,
         fechaFin: DateTime(2026, 10, 20),
+        hoy: hoy,
       );
       final vencimientosTrasFinalizar = await vencimientosDe(contrato.id);
 
@@ -238,6 +256,7 @@ void main() {
         finalizar.ejecutar(
           contratoId: contrato.id,
           fechaFin: DateTime(2026, 11, 20),
+          hoy: hoy,
         ),
         throwsStateError,
       );
@@ -255,6 +274,7 @@ void main() {
         finalizar.ejecutar(
           contratoId: contrato.id,
           fechaFin: DateTime(2026, 7, 1),
+          hoy: hoy,
         ),
         throwsArgumentError,
       );
@@ -268,9 +288,97 @@ void main() {
         () => finalizar.ejecutar(
           contratoId: 'desconocido',
           fechaFin: DateTime(2026, 11, 20),
+          hoy: hoy,
         ),
         throwsA(isA<ContratoNoEncontrado>()),
       );
+    });
+
+    test('una fecha de fin futura se rechaza sin tocar nada', () async {
+      final contrato = await contratoRecienCreado();
+
+      // `Cuota` y `Pago` comparan por id, así que comparar las entidades no
+      // detectaría un cambio de monto, período o fecha. Se retrata su
+      // contenido campo a campo y se ordena para que no dependa del orden.
+      Future<List<String>> retratoDeCuotas() async =>
+          (await cuotas.deContrato(contrato.id))
+              .map(
+                (c) =>
+                    '${c.id}|${c.contratoId}|${c.periodo}|'
+                    '${c.monto}|${c.fechaVencimiento}',
+              )
+              .toList()
+            ..sort();
+
+      Future<List<String>> retratoDePagos() async => (await pagos.todos())
+          .map((p) => '${p.id}|${p.cuotaId}|${p.monto}|${p.fechaPago}')
+          .toList()
+        ..sort();
+
+      final cuotasAntes = await retratoDeCuotas();
+      final pagosAntes = await retratoDePagos();
+      expect(cuotasAntes, isNotEmpty);
+      expect(pagosAntes, isNotEmpty);
+
+      await expectLater(
+        finalizar.ejecutar(
+          contratoId: contrato.id,
+          // Un día después de hoy: la salida todavía no ha ocurrido.
+          fechaFin: DateTime(2026, 12, 2),
+          hoy: hoy,
+        ),
+        throwsA(isA<FechaDeFinFutura>()),
+      );
+
+      // El contrato sigue vigente y la habitación ocupada.
+      expect((await contratos.obtenerPorId(contrato.id))!.estaActivo, isTrue);
+      final listado = await ListarHabitaciones(habitaciones, contratos)
+          .ejecutar();
+      expect(listado.single.estado, EstadoDeOcupacion.ocupada);
+
+      // Ni una cuota ni un pago cambiaron, en número ni en contenido.
+      expect(await retratoDeCuotas(), cuotasAntes);
+      expect(await retratoDePagos(), pagosAntes);
+    });
+
+    test('finalizar hoy mismo se permite', () async {
+      final contrato = await contratoRecienCreado();
+
+      final finalizado = await finalizar.ejecutar(
+        contratoId: contrato.id,
+        fechaFin: hoy,
+        hoy: hoy,
+      );
+
+      expect(finalizado.fechaFin, hoy);
+      expect(finalizado.estaActivo, isFalse);
+    });
+
+    test('finalizar en una fecha pasada se permite', () async {
+      final contrato = await contratoRecienCreado();
+
+      final finalizado = await finalizar.ejecutar(
+        contratoId: contrato.id,
+        fechaFin: DateTime(2026, 9, 30),
+        hoy: hoy,
+      );
+
+      expect(finalizado.fechaFin, DateTime(2026, 9, 30));
+      expect(finalizado.estaActivo, isFalse);
+    });
+
+    test('la hora no cuenta: finalizar hoy vale a cualquier hora', () async {
+      final contrato = await contratoRecienCreado();
+
+      // La fecha de fin lleva hora y es "posterior" a hoy como instante, pero
+      // es el mismo día de calendario.
+      final finalizado = await finalizar.ejecutar(
+        contratoId: contrato.id,
+        fechaFin: DateTime(2026, 12, 1, 23, 59),
+        hoy: DateTime(2026, 12, 1),
+      );
+
+      expect(finalizado.estaActivo, isFalse);
     });
   });
 }

@@ -43,6 +43,46 @@ class CuotaNoEncontrada implements Exception {
   String toString() => 'No existe la cuota $id';
 }
 
+/// Los datos guardados se contradicen: algo apunta a algo que no existe.
+///
+/// No es lo mismo que las excepciones de "no encontrado" de arriba. Aquellas
+/// responden a que alguien pidió algo que no está —una situación normal—;
+/// esta significa que un invariante se ha roto, algo que las claves foráneas
+/// deberían impedir. Por eso no se reutilizan: dan un mensaje tranquilizador a
+/// un problema que no lo es.
+///
+/// Quien la lanza aborta la operación entera. Devolver un resultado parcial, o
+/// rellenar los huecos con textos como "desconocido", escondería el problema en
+/// una pantalla que parecería correcta.
+class ReferenciaInconsistente implements Exception {
+  final String detalle;
+
+  ReferenciaInconsistente(this.detalle);
+
+  @override
+  String toString() => 'Inconsistencia en los datos: $detalle';
+}
+
+/// Se intentó finalizar un contrato en una fecha que todavía no ha llegado.
+///
+/// Finalizar significa que la salida **ya ocurrió**: la fecha de fin puede ser
+/// hoy o una fecha pasada, nunca futura. Programar una salida por adelantado no
+/// forma parte del alcance actual.
+///
+/// Vive aquí y no en el dominio por lo mismo que [HabitacionOcupada]: solo es
+/// comprobable con un dato externo —qué día es hoy— que `Contrato` no conoce.
+class FechaDeFinFutura implements Exception {
+  final DateTime fechaFin;
+  final DateTime hoy;
+
+  FechaDeFinFutura(this.fechaFin, this.hoy);
+
+  @override
+  String toString() =>
+      'La fecha de fin $fechaFin es posterior a hoy ($hoy): un contrato no '
+      'puede finalizarse en el futuro';
+}
+
 /// Regla 1: la habitación ya tiene un contrato activo.
 ///
 /// La regla es de negocio, pero solo es comprobable consultando el almacén, y
