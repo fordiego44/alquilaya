@@ -21,23 +21,37 @@ class HabitacionListada {
 ///
 /// Consulta las habitaciones ocupadas **una sola vez** y cruza en memoria, en
 /// lugar de preguntar por cada habitación.
+///
+/// Las **archivadas se excluyen por defecto**: lo seguro es lo que ocurre si
+/// nadie hace nada, de modo que ninguna pantalla las ofrezca por olvidar un
+/// filtro. Quien necesite verlas —una vista de archivadas, o resolver el nombre
+/// de una habitación de un contrato antiguo— las pide explícitamente.
 class ListarHabitaciones {
   final RepositorioDeHabitaciones _repositorio;
   final ContratosActivos _contratosActivos;
 
   ListarHabitaciones(this._repositorio, this._contratosActivos);
 
-  Future<List<HabitacionListada>> ejecutar() async {
+  /// Con [incluirArchivadas] en `true` devuelve activas **y** archivadas, sin
+  /// distinguirlas: el estado va en cada `Habitacion` y lo interpreta quien las
+  /// muestra.
+  ///
+  /// El filtro se aplica aquí y no en el repositorio: el puerto sigue
+  /// devolviendo todo, y qué se oculta es una decisión de la aplicación.
+  Future<List<HabitacionListada>> ejecutar({
+    bool incluirArchivadas = false,
+  }) async {
     final habitaciones = await _repositorio.listar();
     final ocupadas = await _contratosActivos.habitacionesOcupadas();
     return [
       for (final habitacion in habitaciones)
-        HabitacionListada(
-          habitacion,
-          ocupadas.contains(habitacion.id)
-              ? EstadoDeOcupacion.ocupada
-              : EstadoDeOcupacion.disponible,
-        ),
+        if (incluirArchivadas || !habitacion.archivada)
+          HabitacionListada(
+            habitacion,
+            ocupadas.contains(habitacion.id)
+                ? EstadoDeOcupacion.ocupada
+                : EstadoDeOcupacion.disponible,
+          ),
     ];
   }
 }
