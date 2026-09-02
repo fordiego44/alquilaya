@@ -41,5 +41,17 @@ void main() {
       );
       expect((await repositorio.obtenerPorId('h1'))!.nombre, 'Habitación 1');
     });
+
+    test('editar una habitación archivada no la reactiva', () async {
+      await repositorio.guardar(
+        Habitacion(id: 'h1', nombre: 'Habitación 1').archivar(),
+      );
+
+      final editada = await editar.ejecutar(id: 'h1', nombre: 'Suite');
+
+      expect(editada.archivada, isTrue);
+      expect((await repositorio.obtenerPorId('h1'))!.archivada, isTrue);
+      expect((await repositorio.obtenerPorId('h1'))!.nombre, 'Suite');
+    });
   });
 }

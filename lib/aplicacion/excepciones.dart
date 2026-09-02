@@ -96,3 +96,59 @@ class HabitacionOcupada implements Exception {
   String toString() =>
       'La habitación $habitacionId ya tiene un contrato activo';
 }
+
+/// No se puede eliminar una habitación que tuvo contratos.
+///
+/// Eliminar es físico y definitivo, así que solo se admite cuando no hay nada
+/// que perder. En cuanto existe un contrato —vigente o cerrado hace años— la
+/// habitación forma parte del historial y la salida es **archivarla**.
+class HabitacionConContratos implements Exception {
+  final String habitacionId;
+
+  HabitacionConContratos(this.habitacionId);
+
+  @override
+  String toString() =>
+      'La habitación $habitacionId tiene contratos y no puede eliminarse; '
+      'archívala para conservarlos';
+}
+
+/// No se puede eliminar un inquilino que tuvo contratos.
+class InquilinoConContratos implements Exception {
+  final String inquilinoId;
+
+  InquilinoConContratos(this.inquilinoId);
+
+  @override
+  String toString() =>
+      'El inquilino $inquilinoId tiene contratos y no puede eliminarse; '
+      'archívalo para conservarlos';
+}
+
+/// No se puede archivar una habitación mientras esté ocupada.
+///
+/// Archivar la retira de las opciones para contratos nuevos; hacerlo con un
+/// contrato en curso dejaría al inquilino viviendo en una habitación que la
+/// aplicación ya no ofrece. Primero se finaliza el contrato.
+class HabitacionConContratoActivo implements Exception {
+  final String habitacionId;
+
+  HabitacionConContratoActivo(this.habitacionId);
+
+  @override
+  String toString() =>
+      'La habitación $habitacionId tiene un contrato activo: finalízalo antes '
+      'de archivarla';
+}
+
+/// No se puede archivar un inquilino con un contrato en curso.
+class InquilinoConContratoActivo implements Exception {
+  final String inquilinoId;
+
+  InquilinoConContratoActivo(this.inquilinoId);
+
+  @override
+  String toString() =>
+      'El inquilino $inquilinoId tiene un contrato activo: finalízalo antes de '
+      'archivarlo';
+}

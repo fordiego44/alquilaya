@@ -60,5 +60,31 @@ void main() {
       );
       expect((await repositorio.obtenerPorId('i1'))!.documento, '12345678');
     });
+
+    test('editar a un inquilino archivado no lo reactiva', () async {
+      await repositorio.guardar(
+        Inquilino(
+          id: 'i1',
+          nombre: 'Ana Torres',
+          documento: '12345678',
+          telefono: '999888777',
+        ).archivar(),
+      );
+
+      final editado = await editar.ejecutar(
+        id: 'i1',
+        nombre: 'Ana María Torres',
+        documento: '87654321',
+      );
+
+      expect(editado.archivado, isTrue);
+
+      final guardado = (await repositorio.obtenerPorId('i1'))!;
+      expect(guardado.archivado, isTrue);
+      expect(guardado.nombre, 'Ana María Torres');
+      expect(guardado.documento, '87654321');
+      // El comportamiento de siempre no cambia: omitir el teléfono lo borra.
+      expect(guardado.telefono, isNull);
+    });
   });
 }
