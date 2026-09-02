@@ -85,9 +85,35 @@ llegaría a mostrar totales como `1049.9999999999998`. La conversión entre lo q
 ### Habitaciones
 - Registrar y editar habitaciones.
 - Ver qué habitaciones están **disponibles** y cuáles **ocupadas**.
+- **Archivar** y **reactivar** una habitación.
+- **Eliminar** físicamente una habitación que nunca tuvo contratos.
 
 ### Inquilinos
 - Registrar y editar inquilinos.
+- **Archivar** y **reactivar** un inquilino.
+- **Eliminar** físicamente a un inquilino que nunca tuvo contratos.
+
+### Archivado y eliminación
+
+Retirar una habitación o un inquilino tiene dos formas, y cuál corresponde no lo elige el usuario sino su
+historial (reglas 13 y 14):
+
+- **Archivar** conserva la entidad y todo lo que cuelga de ella. Es **reversible**: reactivar la devuelve a las
+  opciones disponibles y no tiene condiciones.
+- **Eliminar** es físico y definitivo, y **solo se admite si la entidad nunca tuvo contratos**. Basta uno, activo
+  o finalizado, para que forme parte del historial y deje de poder borrarse.
+
+Una entidad con **contrato activo** no puede archivarse: primero debe finalizarse el contrato. Eliminarla tampoco
+es posible, porque la existencia de ese contrato ya forma parte de su historial. Una vez finalizado, sí puede
+archivarse.
+
+Los archivados **no se ofrecen al crear un contrato nuevo**, pero **siguen existiendo**: archivar no elimina
+contratos, cuotas ni pagos, y los contratos históricos siguen mostrando a quién y dónde correspondieron.
+
+Ese nombre es el **actual**, no el del momento del contrato: renombrar una habitación o un inquilino cambia
+también lo que muestra el historial. Es lo deseable al corregir una errata, y para el caso contrario —una
+identidad que de verdad cambia— la salida es archivar la vieja y dar de alta otra. **No se guardan copias
+históricas de los nombres**: sería duplicar un dato para un problema que todavía no ha aparecido (YAGNI).
 
 ### Contratos
 - Crear un contrato de alquiler sobre una habitación disponible.
@@ -197,6 +223,13 @@ Reglas de negocio que el sistema debe garantizar:
     cuota de octubre —que vencía el 20— aún no correspondía y se elimina; la de septiembre, ya vencida e impaga,
     se conserva como deuda.
 
+13. Una habitación o un inquilino con **contrato activo** no puede archivarse. Archivar retira de las opciones
+    futuras; hacerlo con un contrato en curso describiría la vivienda en falso.
+14. Solo puede **eliminarse físicamente** lo que **nunca tuvo contratos**, activos o finalizados. En cuanto
+    existe uno, la entidad pertenece al historial y la única salida es archivarla.
+15. El **archivado es un estado explícito y reversible** de la entidad, no un filtro de la interfaz: se guarda,
+    sobrevive a la edición y se deshace reactivando.
+
 ### Generación de cuotas
 
 Las cuotas se generan de forma **incremental**: desde el mes de inicio hasta el mes actual, más un mes por delante
@@ -278,7 +311,7 @@ aplicacion (casos de uso)
 dominio
 ```
 
-### Esquema local (versión 1)
+### Esquema local (versión 2)
 
 Cinco tablas, una por entidad: `habitaciones`, `inquilinos`, `contratos`, `cuotas` y `pagos`. Sus columnas salen
 una a una de las entidades del dominio; no existe ninguna columna que el dominio no tenga.
@@ -291,13 +324,28 @@ Cómo se traduce cada tipo:
 | `Periodo` | dos `INTEGER`: año y mes |
 | `DateTime` | `TEXT` en **ISO-8601**, con round-trip exacto para las fechas usadas por el dominio |
 | id | `TEXT PRIMARY KEY` |
+| `bool` | `INTEGER` 0/1 — SQLite no tiene booleano |
 | estados derivados | **no se persisten** |
 
 Ni `EstadoCuota` ni el estado de ocupación llegan a la base: son derivados y guardarlos crearía un dato capaz de
 contradecir a los pagos o a los contratos.
 
+El **archivado sí se persiste**, porque no es derivado: es un estado propio de la entidad que alguien decide.
+
+```
+habitaciones.archivada  INTEGER NOT NULL DEFAULT 0
+inquilinos.archivado    INTEGER NOT NULL DEFAULT 0
+```
+
+El `DEFAULT 0` es lo que hace que todo lo que ya existía quede **activo**: ni al crear la base ni al migrarla se
+archiva nada por su cuenta.
+
 Las relaciones —contrato→habitación, contrato→inquilino, cuota→contrato, pago→cuota— son claves foráneas reales,
 activadas con `PRAGMA foreign_keys = ON` en cada conexión.
+
+Esas claves foráneas son además la **última barrera** del borrado: no hay `ON DELETE CASCADE` en ninguna parte, de
+modo que la base rechaza eliminar una habitación o un inquilino referenciado por un contrato aunque la regla 14
+fallara en comprobarlo. La regla vive en la aplicación, que da el mensaje comprensible; la base la respalda.
 
 **El almacenamiento solo protege la integridad estructural**: claves, obligatoriedad y relaciones. Las reglas de
 negocio siguen viviendo exclusivamente en el dominio y la aplicación: monto positivo, un único contrato activo por
@@ -328,13 +376,26 @@ adaptadores.
 
 ### Migraciones
 
-El esquema actual es la **versión 1** y **todavía no hay `onUpgrade`**: sin ninguna versión anterior instalada no
-hay nada que migrar, y escribirlo ahora sería código muerto.
+El esquema actual es la **versión 2**. La v1 no tenía el archivado; la v2 lo añadió con una migración real, no
+borrando la base local.
 
-Cuando el esquema cambie hará falta hacer las tres cosas a la vez:
+`onCreate` **crea directamente la v2**: una instalación nueva no pasa por `onUpgrade`, así que si se quedara atrás
+nacería incompleta. `onUpgrade` pone al día las bases ya instaladas, con un bloque por salto y sin `else`, de modo
+que una base en v1 los recorre todos:
+
+```sql
+-- v1 -> v2
+ALTER TABLE habitaciones ADD COLUMN archivada INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE inquilinos   ADD COLUMN archivado INTEGER NOT NULL DEFAULT 0;
+```
+
+`ADD COLUMN` con `DEFAULT` rellena las filas existentes **sin reescribir la tabla ni tocar sus claves foráneas**:
+nada se pierde y nada queda archivado.
+
+Cuando el esquema vuelva a cambiar harán falta las tres cosas a la vez:
 
 1. incrementar `version`;
-2. añadir la rama correspondiente en `onUpgrade`, que migra las instalaciones **existentes**;
+2. añadir un bloque nuevo en `onUpgrade` —sin tocar los anteriores—, que migra las instalaciones **existentes**;
 3. **actualizar también `onCreate`**, que debe crear directamente el esquema más reciente.
 
 `onCreate` describe siempre el esquema vigente, nunca el histórico: una instalación nueva no dispara `onUpgrade`,
@@ -352,15 +413,27 @@ El MVP tiene interfaz Flutter funcional, con cinco destinos de navegación y una
 - **Inicio / Dashboard** — resumen del estado y puesta al día explícita de cuotas.
 - **Cuotas** — listado con su estado y registro de pagos.
 - **Contratos** — creación, finalización y acceso al historial.
-- **Habitaciones** — registro y estado de ocupación.
-- **Inquilinos** — registro y datos de contacto.
+- **Habitaciones** — registro, edición, estado de ocupación, archivado y borrado, con vistas separadas de
+  activas y archivadas.
+- **Inquilinos** — registro, edición, datos de contacto, archivado y borrado, con vistas de activos y archivados.
 - **Historial de contrato** — cuotas y pagos de un contrato concreto.
 
 ### Persistencia local
 
-SQLite funcionando en Android mediante `sqflite`. **Habitaciones, inquilinos, contratos, cuotas y pagos
-persisten** en el dispositivo. Se verificó cerrar por completo la aplicación y volver a abrirla sin pérdida de
-datos.
+SQLite funcionando en Android mediante `sqflite`, en la **versión 2** del esquema. **Habitaciones, inquilinos,
+contratos, cuotas y pagos persisten** en el dispositivo. Se verificó cerrar por completo la aplicación y volver a
+abrirla sin pérdida de datos.
+
+### Migración v1 → v2 verificada
+
+Además del test automatizado —que parte de una base v1 con datos y comprueba el resultado tras reabrirla—, la
+migración se verificó **a mano sobre la instalación real del emulador**, que tenía una base v1 con una habitación,
+un inquilino y un contrato activo. Tras actualizar la app y arrancarla:
+
+- `user_version` pasó de **1 a 2**;
+- las tres filas conservaron **sus mismos ids y datos**;
+- las referencias del contrato quedaron intactas y su `fecha_fin` siguió en `NULL`;
+- `archivada` y `archivado` quedaron en **0**.
 
 ### Flujo validado manualmente
 
@@ -376,11 +449,16 @@ Recorrido completo probado en el emulador Android S24:
 8. la habitación vuelve a quedar **disponible**;
 9. el historial conserva cuotas y pagos (regla 3).
 
+Y sobre esa misma base migrada: editar una habitación y un inquilino, archivarlos y reactivarlos, comprobar que
+un contrato activo impide archivar, que el historial impide eliminar, que archivar es posible tras finalizar el
+contrato, que los archivados no se ofrecen para contratos nuevos y que los contratos antiguos siguen mostrando
+sus nombres.
+
 ### Calidad
 
 - `flutter analyze`: **limpio**, sin incidencias.
-- `flutter test`: **203 pruebas, todas en verde**.
-- Prueba funcional completa del MVP realizada en el emulador Android S24.
+- `flutter test`: **287 pruebas, todas en verde**.
+- Prueba funcional completa realizada en el emulador Android S24, incluida la migración sobre datos reales.
 
 ### Límites de esta versión
 
