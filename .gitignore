@@ -46,3 +46,6 @@ app.*.map.json
 
 # Node.js tooling
 /node_modules/
+
+# Configuración local de Supabase. El ejemplo con placeholders sí se versiona.
+/config/supabase.json
