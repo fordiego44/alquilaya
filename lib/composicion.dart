@@ -22,6 +22,7 @@ import 'aplicacion/inquilinos/listar_inquilinos.dart';
 import 'aplicacion/inquilinos/reactivar_inquilino.dart';
 import 'aplicacion/inquilinos/registrar_inquilino.dart';
 import 'aplicacion/pagos/registrar_pago.dart';
+import 'aplicacion/puertos/autenticacion.dart';
 import 'aplicacion/puertos/generador_de_id.dart';
 import 'infraestructura/generador_de_id_de_reloj.dart';
 import 'infraestructura/persistencia/repositorio_de_contratos_sqlite.dart';
@@ -82,6 +83,11 @@ class Dependencias {
   /// botón de refrescar del panel, nunca una consulta por su cuenta.
   final ActualizarCuotasDeTodosLosContratos actualizarCuotas;
 
+  /// No es un caso de uso, sino un puerto: la sesión no es una operación del
+  /// negocio de alquileres, pero la interfaz necesita saber si hay una. Viaja
+  /// por aquí para que las pantallas no conozcan Supabase.
+  final Autenticacion autenticacion;
+
   const Dependencias({
     required this.registrarHabitacion,
     required this.listarHabitaciones,
@@ -103,15 +109,22 @@ class Dependencias {
     required this.registrarPago,
     required this.consultarDashboard,
     required this.actualizarCuotas,
+    required this.autenticacion,
   });
 }
 
-/// Cablea la aplicación sobre la base de datos [db].
+/// Cablea la aplicación sobre la base de datos [db] y la sesión [autenticacion].
 ///
 /// Es el *composition root*: aquí, y solo aquí, se elige que los puertos los
 /// implemente SQLite. Sustituir la persistencia significaría cambiar estas
 /// líneas y nada más.
-Dependencias construirDependencias(Database db) {
+///
+/// La autenticación llega ya construida en vez de crearse aquí: su adaptador
+/// necesita un cliente Supabase inicializado, y eso solo lo sabe el arranque.
+Dependencias construirDependencias(
+  Database db, {
+  required Autenticacion autenticacion,
+}) {
   final habitaciones = RepositorioDeHabitacionesSqlite(db);
   final inquilinos = RepositorioDeInquilinosSqlite(db);
   final cuotas = RepositorioDeCuotasSqlite(db);
@@ -192,5 +205,6 @@ Dependencias construirDependencias(Database db) {
       contratos,
       actualizarCuotasDeContrato,
     ),
+    autenticacion: autenticacion,
   );
 }

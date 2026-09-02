@@ -3,6 +3,7 @@ import 'package:sqflite/sqflite.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'composicion.dart';
+import 'infraestructura/autenticacion/autenticacion_supabase.dart';
 import 'infraestructura/persistencia/base_de_datos.dart';
 import 'presentacion/app.dart';
 
@@ -42,6 +43,11 @@ Future<void> main() async {
     url: _supabaseUrl,
     publishableKey: _supabasePublishableKey,
   );
+
+  // El único punto donde se elige Supabase como implementación de la sesión.
+  // De aquí en adelante solo circula el puerto `Autenticacion`.
+  final autenticacion = AutenticacionSupabase(Supabase.instance.client);
+
   // `getDatabasesPath` devuelve la carpeta de bases de datos que la plataforma
   // reserva a la app. Se une con '/' literal en vez de traer `package:path`
   // solo para esto: en Android ese es el separador.
@@ -51,7 +57,7 @@ Future<void> main() async {
   // mostrar, y esconderlo dejaría una app que parece funcionar y no guarda.
   final db = await abrirBaseDeDatos(ruta: ruta);
 
-  final dependencias = construirDependencias(db);
+  final dependencias = construirDependencias(db, autenticacion: autenticacion);
 
   // La puesta al día sí puede fallar sin impedir el arranque: la app sigue
   // siendo usable, solo que la cartera muestra las cuotas que ya existían. Es

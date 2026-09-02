@@ -25,6 +25,7 @@ import 'package:alquilaya/dominio/entidades/contrato.dart';
 import 'package:alquilaya/dominio/entidades/habitacion.dart';
 import 'package:alquilaya/dominio/entidades/inquilino.dart';
 
+import 'autenticacion_en_memoria.dart';
 import 'generador_de_id_secuencial.dart';
 import 'repositorio_de_contratos_en_memoria.dart';
 import 'repositorio_de_cuotas_en_memoria.dart';
@@ -41,10 +42,15 @@ import 'repositorio_de_pagos_en_memoria.dart';
 /// Los parámetros son la **siembra** del escenario: el estado que ya existía
 /// antes de que el usuario abriera la app. No son una API de construcción; para
 /// todo lo demás, los tests usan la interfaz de verdad.
+///
+/// [autenticado] siembra la sesión igual que los demás parámetros siembran los
+/// datos: por defecto ya hay sesión, que es lo que asumen las pruebas de
+/// presentación existentes.
 Dependencias dependenciasEnMemoria({
   List<Habitacion> habitaciones = const [],
   List<Inquilino> inquilinos = const [],
   List<Contrato> contratos = const [],
+  bool autenticado = true,
 }) {
   final repoHabitaciones = RepositorioDeHabitacionesEnMemoria(habitaciones);
   final repoInquilinos = RepositorioDeInquilinosEnMemoria(inquilinos);
@@ -117,5 +123,6 @@ Dependencias dependenciasEnMemoria({
       repoContratos,
       actualizarCuotasDeContrato,
     ),
+    autenticacion: AutenticacionEnMemoria(autenticado: autenticado),
   );
 }
