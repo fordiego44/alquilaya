@@ -1,19 +1,39 @@
 import 'package:flutter/material.dart';
 
+import '../../aplicacion/inquilinos/editar_inquilino.dart';
 import '../../aplicacion/inquilinos/registrar_inquilino.dart';
 import '../../dominio/entidades/inquilino.dart';
 import '../comun/mensajes.dart';
 
-/// Alta de un inquilino. Se cierra devolviendo el inquilino creado, o `null` si
-/// el usuario se echó atrás.
+/// Alta o edición de un inquilino. Se cierra devolviendo el inquilino guardado,
+/// o `null` si el usuario se echó atrás.
+///
+/// El mismo formulario sirve para las dos cosas: los campos son idénticos y
+/// duplicarlo obligaría a arreglar cada cambio dos veces. Lo distingue
+/// [inquilino]: si viene, se edita ese; si es `null`, se da de alta uno nuevo.
 ///
 /// Documento y teléfono son opcionales. Un campo vacío se envía como `null`,
 /// que es como [Inquilino] representa "no se conoce": mandar una cadena en
 /// blanco sería un segundo modo de decir lo mismo, y el dominio lo rechaza.
+/// Al editar, eso significa que vaciar un campo **borra** el dato, igual que
+/// hace `EditarInquilino`.
+///
+/// **Editar no toca el archivado**: ni se menciona aquí. Lo conserva el caso de
+/// uso a partir de lo guardado, de modo que corregir un nombre no puede
+/// reactivar a alguien archivado.
 class FormularioDeInquilino extends StatefulWidget {
   final RegistrarInquilino registrarInquilino;
+  final EditarInquilino editarInquilino;
 
-  const FormularioDeInquilino({super.key, required this.registrarInquilino});
+  /// `null` para dar de alta.
+  final Inquilino? inquilino;
+
+  const FormularioDeInquilino({
+    super.key,
+    required this.registrarInquilino,
+    required this.editarInquilino,
+    this.inquilino,
+  });
 
   @override
   State<FormularioDeInquilino> createState() => _FormularioDeInquilinoState();
@@ -21,10 +41,22 @@ class FormularioDeInquilino extends StatefulWidget {
 
 class _FormularioDeInquilinoState extends State<FormularioDeInquilino> {
   final _formulario = GlobalKey<FormState>();
-  final _nombre = TextEditingController();
-  final _documento = TextEditingController();
-  final _telefono = TextEditingController();
+  late final TextEditingController _nombre;
+  late final TextEditingController _documento;
+  late final TextEditingController _telefono;
   bool _guardando = false;
+
+  bool get _esEdicion => widget.inquilino != null;
+
+  @override
+  void initState() {
+    super.initState();
+    final inquilino = widget.inquilino;
+    // Un dato ausente es `null` en el dominio y cadena vacía en el campo.
+    _nombre = TextEditingController(text: inquilino?.nombre ?? '');
+    _documento = TextEditingController(text: inquilino?.documento ?? '');
+    _telefono = TextEditingController(text: inquilino?.telefono ?? '');
+  }
 
   @override
   void dispose() {
@@ -46,11 +78,21 @@ class _FormularioDeInquilinoState extends State<FormularioDeInquilino> {
 
     setState(() => _guardando = true);
     try {
-      final inquilino = await widget.registrarInquilino.ejecutar(
-        nombre: _nombre.text.trim(),
-        documento: _opcional(_documento),
-        telefono: _opcional(_telefono),
-      );
+      final nombre = _nombre.text.trim();
+      final documento = _opcional(_documento);
+      final telefono = _opcional(_telefono);
+      final inquilino = _esEdicion
+          ? await widget.editarInquilino.ejecutar(
+              id: widget.inquilino!.id,
+              nombre: nombre,
+              documento: documento,
+              telefono: telefono,
+            )
+          : await widget.registrarInquilino.ejecutar(
+              nombre: nombre,
+              documento: documento,
+              telefono: telefono,
+            );
       if (mounted) Navigator.pop(context, inquilino);
     } catch (error) {
       if (!mounted) return;
@@ -64,7 +106,9 @@ class _FormularioDeInquilinoState extends State<FormularioDeInquilino> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Nuevo inquilino')),
+      appBar: AppBar(
+        title: Text(_esEdicion ? 'Editar inquilino' : 'Nuevo inquilino'),
+      ),
       body: Form(
         key: _formulario,
         child: ListView(

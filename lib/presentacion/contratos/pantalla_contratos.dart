@@ -47,8 +47,19 @@ class _PantallaContratosState extends State<PantallaContratos> {
   Future<_Listado> _consultar() async {
     final dependencias = widget.dependencias;
     final contratos = await dependencias.listarContratos.ejecutar();
-    final habitaciones = await dependencias.listarHabitaciones.ejecutar();
-    final inquilinos = await dependencias.listarInquilinos.ejecutar();
+    // Con los archivados incluidos **a propósito**: aquí solo se resuelven
+    // nombres para contratos que ya existen, y un contrato antiguo de una
+    // habitación archivada debe seguir diciendo cómo se llamaba, no
+    // "Habitación eliminada".
+    //
+    // Esto no los hace elegibles para un contrato nuevo: `FormularioDeContrato`
+    // pide los listados por defecto, que sí los excluyen.
+    final habitaciones = await dependencias.listarHabitaciones.ejecutar(
+      incluirArchivadas: true,
+    );
+    final inquilinos = await dependencias.listarInquilinos.ejecutar(
+      incluirArchivados: true,
+    );
 
     return _Listado(
       contratos,

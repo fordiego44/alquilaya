@@ -14,6 +14,19 @@ String mensajeDeError(Object error) => switch (error) {
   // Reglas de negocio comprobadas contra el almacén.
   HabitacionOcupada() => 'Esa habitación ya tiene un contrato activo.',
 
+  // Eliminar es físico: solo cabe para lo que nunca se usó. El mensaje ofrece
+  // la salida correcta en vez de dejar al usuario adivinando.
+  HabitacionConContratos() =>
+    'Esa habitación tiene contratos. Archívala para conservar el historial.',
+  InquilinoConContratos() =>
+    'Ese inquilino tiene contratos. Archívalo para conservar el historial.',
+
+  // Archivar sí es posible, pero no mientras alguien viva allí.
+  HabitacionConContratoActivo() =>
+    'Esa habitación tiene un contrato activo. Finalízalo antes de archivarla.',
+  InquilinoConContratoActivo() =>
+    'Ese inquilino tiene un contrato activo. Finalízalo antes de archivarlo.',
+
   // Finalizar significa que la salida ya ocurrió.
   FechaDeFinFutura() => 'No puedes finalizar un contrato en una fecha futura.',
 

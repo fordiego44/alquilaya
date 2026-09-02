@@ -2,7 +2,7 @@ import 'package:alquilaya/presentacion/app.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import '../widget_test.dart';
+import '../dobles/dependencias_en_memoria.dart';
 
 /// Reproduce el fallo visto en el emulador: al volver del formulario, la
 /// habitación recién creada no aparece en el listado hasta cambiar de pestaña
