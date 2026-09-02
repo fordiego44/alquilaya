@@ -7,9 +7,17 @@ import 'package:alquilaya/aplicacion/contratos/listar_contratos.dart';
 import 'package:alquilaya/aplicacion/cuotas/listar_cuotas.dart';
 import 'package:alquilaya/aplicacion/cuotas/listar_cuotas_para_cobro.dart';
 import 'package:alquilaya/aplicacion/dashboard/consultar_dashboard.dart';
+import 'package:alquilaya/aplicacion/habitaciones/archivar_habitacion.dart';
+import 'package:alquilaya/aplicacion/habitaciones/editar_habitacion.dart';
+import 'package:alquilaya/aplicacion/habitaciones/eliminar_habitacion.dart';
 import 'package:alquilaya/aplicacion/habitaciones/listar_habitaciones.dart';
+import 'package:alquilaya/aplicacion/habitaciones/reactivar_habitacion.dart';
 import 'package:alquilaya/aplicacion/habitaciones/registrar_habitacion.dart';
+import 'package:alquilaya/aplicacion/inquilinos/archivar_inquilino.dart';
+import 'package:alquilaya/aplicacion/inquilinos/editar_inquilino.dart';
+import 'package:alquilaya/aplicacion/inquilinos/eliminar_inquilino.dart';
 import 'package:alquilaya/aplicacion/inquilinos/listar_inquilinos.dart';
+import 'package:alquilaya/aplicacion/inquilinos/reactivar_inquilino.dart';
 import 'package:alquilaya/aplicacion/inquilinos/registrar_inquilino.dart';
 import 'package:alquilaya/aplicacion/pagos/registrar_pago.dart';
 import 'package:alquilaya/composicion.dart';
@@ -57,8 +65,16 @@ Dependencias dependenciasEnMemoria() {
   return Dependencias(
     registrarHabitacion: RegistrarHabitacion(habitaciones, generadorDeId),
     listarHabitaciones: listarHabitaciones,
+    editarHabitacion: EditarHabitacion(habitaciones),
+    eliminarHabitacion: EliminarHabitacion(habitaciones, contratos),
+    archivarHabitacion: ArchivarHabitacion(habitaciones, contratos),
+    reactivarHabitacion: ReactivarHabitacion(habitaciones),
     registrarInquilino: RegistrarInquilino(inquilinos, generadorDeId),
     listarInquilinos: ListarInquilinos(inquilinos),
+    editarInquilino: EditarInquilino(inquilinos),
+    eliminarInquilino: EliminarInquilino(inquilinos, contratos),
+    archivarInquilino: ArchivarInquilino(inquilinos, contratos),
+    reactivarInquilino: ReactivarInquilino(inquilinos),
     crearContrato: CrearContrato(
       contratos,
       cuotas,

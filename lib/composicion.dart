@@ -9,9 +9,17 @@ import 'aplicacion/contratos/listar_contratos.dart';
 import 'aplicacion/cuotas/listar_cuotas.dart';
 import 'aplicacion/cuotas/listar_cuotas_para_cobro.dart';
 import 'aplicacion/dashboard/consultar_dashboard.dart';
+import 'aplicacion/habitaciones/archivar_habitacion.dart';
+import 'aplicacion/habitaciones/editar_habitacion.dart';
+import 'aplicacion/habitaciones/eliminar_habitacion.dart';
 import 'aplicacion/habitaciones/listar_habitaciones.dart';
+import 'aplicacion/habitaciones/reactivar_habitacion.dart';
 import 'aplicacion/habitaciones/registrar_habitacion.dart';
+import 'aplicacion/inquilinos/archivar_inquilino.dart';
+import 'aplicacion/inquilinos/editar_inquilino.dart';
+import 'aplicacion/inquilinos/eliminar_inquilino.dart';
 import 'aplicacion/inquilinos/listar_inquilinos.dart';
+import 'aplicacion/inquilinos/reactivar_inquilino.dart';
 import 'aplicacion/inquilinos/registrar_inquilino.dart';
 import 'aplicacion/pagos/registrar_pago.dart';
 import 'aplicacion/puertos/generador_de_id.dart';
@@ -29,17 +37,32 @@ import 'infraestructura/persistencia/repositorio_de_pagos_sqlite.dart';
 /// dependencias ni qué las implementa.
 ///
 /// No es un contenedor de inyección: es una clase Dart con campos finales. Con
-/// doce casos de uso y un solo grafo, un service locator solo añadiría magia.
+/// veinte casos de uso y un solo grafo, un service locator solo añadiría magia.
 ///
-/// Solo están los que alguna pantalla usa. Los casos de uso de edición y de
-/// consulta puntual existen en la aplicación, pero mientras ninguna pantalla
-/// los llame no tienen por qué aparecer aquí.
+/// Aquí se exponen los casos de uso que forman parte del flujo de presentación
+/// actual o que serán consumidos por las operaciones de habitaciones e
+/// inquilinos en el siguiente paso de UI.
+///
+/// `ObtenerHabitacion`, `ObtenerInquilino` y `ConsultarOcupacionDeHabitacion`
+/// siguen sin consumidor, así que no aparecen aquí.
 class Dependencias {
   final RegistrarHabitacion registrarHabitacion;
   final ListarHabitaciones listarHabitaciones;
+  final EditarHabitacion editarHabitacion;
+
+  /// Eliminar es físico y solo vale para lo que nunca se usó; archivar conserva
+  /// el historial. Cuál de los dos procede lo decide el caso de uso, no la
+  /// pantalla.
+  final EliminarHabitacion eliminarHabitacion;
+  final ArchivarHabitacion archivarHabitacion;
+  final ReactivarHabitacion reactivarHabitacion;
 
   final RegistrarInquilino registrarInquilino;
   final ListarInquilinos listarInquilinos;
+  final EditarInquilino editarInquilino;
+  final EliminarInquilino eliminarInquilino;
+  final ArchivarInquilino archivarInquilino;
+  final ReactivarInquilino reactivarInquilino;
 
   final CrearContrato crearContrato;
   final ListarContratos listarContratos;
@@ -62,8 +85,16 @@ class Dependencias {
   const Dependencias({
     required this.registrarHabitacion,
     required this.listarHabitaciones,
+    required this.editarHabitacion,
+    required this.eliminarHabitacion,
+    required this.archivarHabitacion,
+    required this.reactivarHabitacion,
     required this.registrarInquilino,
     required this.listarInquilinos,
+    required this.editarInquilino,
+    required this.eliminarInquilino,
+    required this.archivarInquilino,
+    required this.reactivarInquilino,
     required this.crearContrato,
     required this.listarContratos,
     required this.finalizarContrato,
@@ -116,8 +147,18 @@ Dependencias construirDependencias(Database db) {
   return Dependencias(
     registrarHabitacion: RegistrarHabitacion(habitaciones, generadorDeId),
     listarHabitaciones: listarHabitaciones,
+    editarHabitacion: EditarHabitacion(habitaciones),
+    // Eliminar y archivar necesitan ver los contratos: uno para saber si la
+    // habitación tiene historial, el otro si está ocupada ahora mismo.
+    eliminarHabitacion: EliminarHabitacion(habitaciones, contratos),
+    archivarHabitacion: ArchivarHabitacion(habitaciones, contratos),
+    reactivarHabitacion: ReactivarHabitacion(habitaciones),
     registrarInquilino: RegistrarInquilino(inquilinos, generadorDeId),
     listarInquilinos: ListarInquilinos(inquilinos),
+    editarInquilino: EditarInquilino(inquilinos),
+    eliminarInquilino: EliminarInquilino(inquilinos, contratos),
+    archivarInquilino: ArchivarInquilino(inquilinos, contratos),
+    reactivarInquilino: ReactivarInquilino(inquilinos),
     crearContrato: CrearContrato(
       contratos,
       cuotas,
