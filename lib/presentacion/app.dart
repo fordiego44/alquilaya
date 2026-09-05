@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 
 import '../composicion.dart';
-import 'navegacion_principal.dart';
+import 'autenticacion/puerta_de_autenticacion.dart';
 
 /// Raíz de la interfaz.
 ///
-/// Recibe las [Dependencias] ya construidas y las entrega a la navegación: no
-/// las crea ni sabe qué hay detrás de ellas. Su única responsabilidad propia es
-/// el tema.
+/// Recibe las [Dependencias] ya construidas y las entrega a la puerta de
+/// autenticación, que decide si se ve el login o la navegación: no las crea ni
+/// sabe qué hay detrás de ellas. Su única responsabilidad propia es el tema.
 class AlquilaYaApp extends StatelessWidget {
   final Dependencias dependencias;
 
@@ -22,7 +22,7 @@ class AlquilaYaApp extends StatelessWidget {
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.teal),
       ),
-      home: NavegacionPrincipal(dependencias: dependencias),
+      home: PuertaDeAutenticacion(dependencias: dependencias),
     );
   }
 }
